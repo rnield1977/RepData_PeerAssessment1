@@ -1,20 +1,115 @@
-# Reproducible Research: Peer Assessment 1
+---
+title: "Reproducable Research Assignment 1"
+author: "Robert Nield"
+date: "Thursday, September 11, 2014"
+output: html_document
 
+---
+Summary:
+Looking at the number of steps over several days we see variation of steps depending on each day of the week. We show the data over time and seperated weekday and weeekends.
 
-## Loading and preprocessing the data
+##Load the necessary libraries
+```{r,echo=TRUE}
+  library(lubridate)
+  library(ggplot2)
+  library(mice)
 
+```
+Each of these libraries are used for a specific purpose. Lubridate is used to cast the dates. The library ggplot2 is used for some of the grpahs. Mice is used for imputing missing data.
 
+##Load the data
 
-## What is mean total number of steps taken per day?
+```{r, echo=TRUE}
 
+#download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip", "activity.zip")
+activitydt <- read.csv(unz("activity.zip","activity.csv"))
 
+```
 
-## What is the average daily activity pattern?
+## Modify the dates so they are correct
 
+The ymd function is from lubridate.
+```{r,echo=TRUE}
+  activitydt$date <- ymd(activitydt$date)
+  
+```
+
+## Sum the number of steps each day
+```{r,echo=TRUE}
+  sum_daily_steps <- tapply(activitydt$steps, activitydt$date, FUN=sum, na.rm=TRUE)
+  plot(sum_daily_steps, type='h',  xlab="Days", ylab="Number of Steps")
+  title("Number of steps per day")
+```
+
+## Get the mean steps for each day
+```{r,echo=TRUE}
+  mean_daily_steps <- mean(sum_daily_steps)
+  print(mean_daily_steps)
+```
+## Get the median steps for each day
+```{r,echo=TRUE}
+  med_daily_steps <- median(sum_daily_steps)
+  print(med_daily_steps)
+```
+
+## Graph the average steps at a 5 min interval
+```{r,echo=TRUE}
+  act_agg <- aggregate(x=list(steps=activitydt$steps), by=list(interval=activitydt$interval), FUN = mean, na.rm=TRUE)
+  plot(act_agg$interval,act_agg$steps, xlab="5 Minute Interval", ylab="Number of steps", type="l")
+  title("Steps over 5 minute intervals")
+```
+
+###Average across all the days the 5 minute interval that contains the max number of steps
+
+```{r,echo=TRUE}
+act_agg[which.max(act_agg$steps),]
+```
 
 
 ## Imputing missing values
+First we want to see how many missings values are in the steps.
+```{r,echo=TRUE}
+num_missing <- is.na(activitydt$steps)
+table(num_missing)
+```
+
+###Data Immputation using Mice package
+Now using the mice package to modify the data
+```{r,echo=TRUE}
+imp <- mice(activitydt[,c(1,3)])
+dtimp <- complete(imp)
+activityimp <- activitydt
+activityimp$steps <- dtimp$steps
+```
+
+####Now that we have the new data we will get the mean and median steps
+
+```{r,echo=TRUE}
+  sum_daily_steps_imp <- tapply(activityimp$steps, activityimp$date, FUN=sum)
+  plot(sum_daily_steps_imp, type='h',  xlab="Days", ylab="Number of Steps")
+  title("Number of steps per day")
+
+  mean(sum_daily_steps_imp)
+  median(sum_daily_steps_imp)
+```
+ 
+ Both median and mean steps are higher as imputing the data eliminated many of the NA.
+ 
+ 
+ ##Are there differences in activity patterns between weekdays and weekends?
+```{r,echo=TRUE}
+
+activityimp$weekday <- weekdays(activityimp$date)
+ activityimp$dayofweektype <- ifelse(activityimp$weekday == 'Saturday' | activityimp$weekday == 'Sunday',"Weekend","Weekday")
+ weekdaydt <- subset(activityimp, activityimp$dayofweektype == "Weekday")
+ weekenddt <- subset(activityimp, activityimp$dayofweektype == "Weekend")
+ averages <- aggregate(steps ~ interval + dayofweektype, data = activityimp, mean)
+```
+ 
+ Making a panel plot for average steps taken on weekdays and weekends.
+```{r,echo=TRUE}
+ ggplot(averages, aes(interval, steps)) + geom_line() + facet_grid(dayofweektype ~ .) + xlab("5-minute interval") + ylab("Number of steps")
+```
+ 
 
 
-
-## Are there differences in activity patterns between weekdays and weekends?
